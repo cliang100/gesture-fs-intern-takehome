@@ -13,6 +13,8 @@ Useful docs:
 """
 
 import os
+import argparse
+from typing import List, Dict
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from src.knowledge_base import build_knowledge_base
 
@@ -80,51 +82,65 @@ def ask_question(vector_store, llm, question: str) -> dict:
             "answer"  -> str: the generated answer
             "sources" -> list[str]: the chunk texts that were retrieved
     """
+    question = question.strip()
+    if not question:
+        raise ValueError("Question must not be empty.")
+
     docs = vector_store.similarity_search(question, k=3)
     sources = [doc.page_content for doc in docs]
     context = "\n\n".join(sources)
 
     prompt = PROMPT_TEMPLATE.format(context=context, question=question)
-
-    result = llm(prompt)
-    answer = result[0]["generated_text"]
+    answer = llm(prompt)[0]["generated_text"].strip()
 
     return {"answer": answer, "sources": sources}
+
+
+def print_result(result: Dict[str, object]) -> None:
+    """Print a Q&A result: numbered sources, then the answer."""
+    print("\n📄 Sources:")
+    for i, source in enumerate(result["sources"], start=1):
+        preview = source if len(source) <= 150 else source[:150] + "..."
+        print(f"  {i}. {preview}")
+    print(f"\n💬 Answer: {result['answer']}\n")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # TODO 2: Complete the interactive loop
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def main():
-    """Interactive Q&A loop.
+    parser = argparse.ArgumentParser(description="Ask the marketing agency's Q&A bot a question.")
+    parser.add_argument("--query", help="Ask a single question and exit, instead of looping.")
+    args = parser.parse_args()
 
-    Steps:
-      1. Build the knowledge base using build_knowledge_base()
-         with the data/ directory path.
-      2. Load the LLM using get_llm().
-      3. Start a loop that:
-         - Prompts the user for a question with input()
-         - Exits if they type "quit"
-         - Calls ask_question() with their input
-         - Prints the retrieved sources and the answer
-    """
     data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
+    if not os.path.isdir(data_dir):
+        print(f"Error: data directory not found at {data_dir}")
+        return
 
+    print("Building knowledge base...")
     vector_store = build_knowledge_base(data_dir)
+    print("Loading LLM...")
     llm = get_llm()
 
+    if args.query:
+        print_result(ask_question(vector_store, llm, args.query))
+        return
+
+    print("\nReady! Ask a question (or type 'quit' to exit).")
     while True:
-        question = input("> ").strip()
-        if question.lower() == "quit":
+        try:
+            question = input("\n> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
             break
 
-        result = ask_question(vector_store, llm, question)
-
-        print("\n📄 Sources:")
-        for i, source in enumerate(result["sources"], 1):
-            print(f"  {i}. {source}")
-        print(f"\n💬 Answer: {result['answer']}\n")
-
+        if question.lower() == "quit":
+            break
+        try:
+            print_result(ask_question(vector_store, llm, question))
+        except ValueError as e:
+            print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
