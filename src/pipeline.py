@@ -110,8 +110,20 @@ def main():
     """
     data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
 
-    # TODO: implement this (~10-12 lines)
-    raise NotImplementedError("TODO 2: Complete the interactive loop")
+    vector_store = build_knowledge_base(data_dir)
+    llm = get_llm()
+
+    while True:
+        question = input("> ").strip()
+        if question.lower() == "quit":
+            break
+
+        result = ask_question(vector_store, llm, question)
+
+        print("\n📄 Sources:")
+        for i, source in enumerate(result["sources"], 1):
+            print(f"  {i}. {source}")
+        print(f"\n💬 Answer: {result['answer']}\n")
 
 
 if __name__ == "__main__":
