@@ -123,8 +123,11 @@ def main():
     print("Loading LLM...")
     llm = get_llm()
 
-    if args.query:
-        print_result(ask_question(vector_store, llm, args.query))
+    if args.query is not None:
+        try:
+            print_result(ask_question(vector_store, llm, args.query))
+        except ValueError as e:
+            print(f"Error: {e}")
         return
 
     print("\nReady! Ask a question (or type 'quit' to exit).")

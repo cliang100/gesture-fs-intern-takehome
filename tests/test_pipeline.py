@@ -9,7 +9,7 @@ import pytest
 from transformers import pipeline as hf_pipeline
 
 from src.knowledge_base import build_knowledge_base
-from src.pipeline import ask_question, get_llm
+from src.pipeline import ask_question, get_llm, print_result
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
@@ -95,3 +95,40 @@ class TestAnswerGeneration:
         assert "2,500" in answer or "2500" in answer or "starter" in answer, (
             "Answer should address the pricing question"
         )
+
+
+# ────────────────────────────────
+# Input validation (bonus)
+# ────────────────────────────────
+class TestInputValidation:
+    def test_empty_question_raises_value_error(self, vector_store, llm):
+        with pytest.raises(ValueError):
+            ask_question(vector_store, llm, "")
+
+    def test_whitespace_only_question_raises_value_error(self, vector_store, llm):
+        with pytest.raises(ValueError):
+            ask_question(vector_store, llm, "   ")
+
+    def test_question_is_stripped(self, vector_store, llm):
+        result = ask_question(vector_store, llm, "  How much does the Growth package cost?  ")
+        assert isinstance(result["answer"], str)
+        assert len(result["answer"].strip()) > 0
+        
+
+# ────────────────────────────────
+# print_result formatting (bonus)
+# ────────────────────────────────
+class TestPrintResult:
+    def test_truncates_long_sources(self, capsys):
+        long_source = "x" * 300
+        print_result({"answer": "test answer", "sources": [long_source]})
+        captured = capsys.readouterr()
+        assert "..." in captured.out
+        assert long_source not in captured.out  # full untruncated text shouldn't appear
+
+    def test_short_source_not_truncated(self, capsys):
+        short_source = "short chunk of text"
+        print_result({"answer": "test answer", "sources": [short_source]})
+        captured = capsys.readouterr()
+        assert short_source in captured.out
+        assert "..." not in captured.out
